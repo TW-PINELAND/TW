@@ -161,6 +161,17 @@
   .tab-item:hover{ color:var(--ink); }
   /* 지금 선택되어 있는(보여지고 있는) 탭 - 초록 글자 + 초록 밑줄로 강조 */
   .tab-item.active{ color:var(--blueprint); border-bottom-color:var(--blueprint); font-weight:600; }
+  /* 관리자 로그인 상태일 때만 탭에 draggable="true"가 붙는데, 그럴 때 마우스 커서를
+     "손으로 움켜쥔" 모양(grab)으로 바꿔서 "이거 드래그해서 순서 바꿀 수 있어요"를 알려줌 */
+  .tab-item[draggable="true"]{ cursor:grab; }
+  /* 지금 막 손으로 집어서 드래그하고 있는 탭 - 살짝 투명하게 만들어서 "지금 옮기는 중"임을 표시 */
+  .tab-item.dragging{ opacity:0.35; }
+  /* 드래그해서 들고 있는 탭을 다른 탭 위로 가져갔을 때, 그 자리(탭 왼쪽)에 초록 세로줄을 그어서
+     "여기에 놓으면 이 탭 앞에 끼워진다"를 미리 보여주는 표시 */
+  .tab-item.drag-over{ box-shadow:inset 3px 0 0 var(--blueprint); }
+  /* 관리자에게만 보이는 작은 점 6개(⠿ 비슷한 손잡이 표시) - 실제로 이 점만 드래그되는 게 아니라
+     탭 전체가 드래그 가능하지만, "여기를 잡고 끌 수 있다"는 걸 시각적으로 알려주는 장식용 아이콘 */
+  .tab-drag-hint{ color:#B8C0CC; margin-right:6px; font-size:12px; pointer-events:none; letter-spacing:-1px; }
   /* 탭 안의 실제 이름 글자. 관리자가 아니면 그냥 텍스트, 관리자면 클릭해서 바로 타이핑 가능한 상태(JS가 처리) */
   .tab-label{ outline:none; }
   .tab-label[contenteditable="true"]{ cursor:text; }
@@ -280,11 +291,20 @@
     background:#fff; border-radius:14px; width:100%;
     box-shadow:0 12px 40px rgba(0,0,0,0.25);
     display:flex; flex-direction:column;
-    max-height:90vh;
+    max-height:90vh;   /* ★ 팝업창 크기(세로) - 화면 세로 높이의 90%를 넘지 않도록 하는 "최대" 값 */
   }
   .modal-box.modal-sm{ max-width:340px; }
   .modal-box.modal-md{ max-width:560px; }
-  .modal-box.modal-lg{ max-width:720px; }
+  /* ★ 상세보기 팝업 + 글쓰기/수정 팝업(둘 다 이 modal-lg 크기를 씀)에 적용되는 크기 값들
+     - 팝업창 크기(가로): max-width - 화면 가로 폭의 90%까지 커짐(90vw)
+     - 팝업창 크기(세로): min-height - 내용이 아무리 적어도 화면 세로 높이의 65%만큼은 항상 확보됨(65vh)
+       (내용이 그보다 많아지면 위 .modal-box의 max-height:90vh까지는 자연스럽게 더 늘어나고,
+        그 이상은 스크롤로 처리됨)
+     ※ 숫자만 바꾸고 싶으면 아래 90vw / 65vh의 숫자 부분만 고치면 됩니다. (vw=가로 기준 %, vh=세로 기준 %) */
+  .modal-box.modal-lg{
+    max-width:60vw;   /* 팝업창 크기(가로) */
+    min-height:60vh;  /* 팝업창 크기(세로) */
+  }
 
   .modal-head{
     display:flex; align-items:center; justify-content:space-between;
@@ -296,7 +316,14 @@
     color:var(--muted); padding:4px; border-radius:6px; line-height:0;
   }
   .modal-close:hover{ background:var(--paper); color:var(--ink); }
-  .modal-body{ padding:20px; overflow-y:auto; }
+  /* modal-body: 팝업의 "가운데" 영역. flex:1로 줘서, 팝업이 min-height(65vh) 때문에
+     내용보다 더 커진 만큼의 남는 공간을 이 부분이 전부 흡수하도록 함.
+     → 이렇게 해야 아래쪽 "취소/저장" 버튼(modal-foot)이 붕 뜨지 않고 항상 팝업 맨 아래에 붙어있게 됨. */
+  .modal-body{
+    padding:20px; overflow-y:auto;
+    flex:1 1 auto;               /* 남는 세로 공간을 이 영역이 다 차지함 */
+    display:flex; flex-direction:column;
+  }
   .modal-foot{
     display:flex; align-items:center; justify-content:flex-end; gap:8px;
     padding:14px 20px; border-top:1px solid var(--line); flex-shrink:0;
@@ -321,18 +348,30 @@
     outline:none;
   }
   .field-input:focus{ border-color:var(--blueprint); background:var(--blueprint-bg); }
-  .field-gap{ margin-bottom:16px; }
+  .field-gap{ margin-bottom:16px; flex-shrink:0; }
 
-  /* 본문 작성 영역 - contenteditable div. 글자 타이핑 + 이미지 붙여넣기(Ctrl+V)가 모두 여기서 이루어짐 */
+  /* 글쓰기/수정 팝업의 "내용" 영역 전체를 감싸는 상자.
+     flex:1로 줘서, 위 modal-body 안에서 "제목" 칸을 뺀 나머지 공간을 이 상자가 전부 차지하게 함
+     → 그래야 안에 있는 content-editor(실제 타이핑하는 칸)도 그만큼 커져서, 팝업 크기에 맞게
+       "내용 입력칸이 널찍하게" 보이게 됨. */
+  .content-editor-wrap{
+    display:flex; flex-direction:column;
+    flex:1 1 auto;
+    min-height:0; /* flex 안에서 스크롤이 제대로 동작하려면 필요한 기술적 설정 (없으면 안 줄어듦) */
+  }
+  /* 본문 작성 영역 - contenteditable div. 글자 타이핑 + 이미지 붙여넣기(Ctrl+V)가 모두 여기서 이루어짐
+     ★ 팝업창 크기(세로): min-height:220px는 "아무리 좁아도 최소 이만큼은 확보"하는 바닥값이고,
+       flex:1로 인해 실제로는 위 .content-editor-wrap이 확보한 공간만큼 더 커짐 (팝업이 크면 입력칸도 커짐) */
   .content-editor{
     width:100%; min-height:220px; border:1px solid var(--line); border-radius:8px;
     padding:12px; font-size:14px; line-height:1.6; color:var(--ink);
     outline:none; overflow-y:auto;
+    flex:1 1 auto; min-height:0;
   }
   .content-editor:focus{ border-color:var(--blueprint); }
   .content-editor:empty::before{ content: attr(data-placeholder); color:#9AA5B1; }
   .content-editor img{ max-width:100%; border-radius:8px; margin:8px 0; display:block; }
-  .editor-hint{ font-size:12px; color:var(--muted); margin-top:6px; }
+  .editor-hint{ font-size:12px; color:var(--muted); margin-top:6px; flex-shrink:0; }
 
   /* 상세보기 팝업 안의 본문 표시 영역 (읽기 전용) */
   .post-detail-date{ font-size:12.5px; color:var(--muted); font-family:var(--mono); margin-bottom:16px; }
@@ -509,7 +548,7 @@
         <input type="text" class="field-input" id="writeTitleInput" placeholder="제목을 입력하세요"
           onkeydown="if(event.key==='Enter'){ event.preventDefault(); savePost(); }">
       </div>
-      <div>
+      <div class="content-editor-wrap">
         <span class="field-label">내용</span>
         <div class="content-editor" id="writeContentEditor" contenteditable="true"
           data-placeholder="내용을 입력하세요. 이미지는 복사한 뒤 이 안에 Ctrl+V로 붙여넣으면 자동으로 첨부됩니다."></div>
@@ -542,8 +581,11 @@ const SUPABASE_URL = "https://esrokiscqfqgixnfoqni.supabase.co";
 const SUPABASE_KEY = "sb_publishable_uc0ycSOHI5qhHa4Jq-x0tA_azNozk7R";
 const IMAGE_BUCKET = "post-images";
 
-// ★ 관리자 비밀번호 - 임시값입니다. 아래 따옴표 안 글자만 원하는 비밀번호로 바꾸면 됩니다.
-const ADMIN_PASSWORD = "temp1234";
+// ★★★ 관리자 비밀번호 ★★★
+// 지금은 "0000"으로 설정되어 있습니다.
+// 비밀번호를 바꾸고 싶으면, 아래 큰따옴표(" ") 안의 글자만 원하는 비밀번호로 고치면 됩니다.
+// (예: "0000" → "myPassword123" 이런 식으로 통째로 바꿔치기하면 됨. 저장하고 새로고침하면 바로 적용됨)
+const ADMIN_PASSWORD = "0000";
 
 // ----------------------------------------------------------------------------
 // ▣ Supabase에 요청을 보내는 공용 함수
@@ -739,7 +781,16 @@ async function bootTabsAndPosts(){
 function renderTabs(){
   const bar = document.getElementById('tabBar');
   let html = tabs.map(t => `
-    <div class="tab-item ${t.id === activeTabId ? 'active' : ''}" data-tab-id="${t.id}" onclick="onTabItemClick('${t.id}')">
+    <div class="tab-item ${t.id === activeTabId ? 'active' : ''}" data-tab-id="${t.id}" onclick="onTabItemClick('${t.id}')"
+      draggable="${isAdmin ? 'true' : 'false'}"
+      ondragstart="onTabDragStart(event, '${t.id}')"
+      ondragover="onTabDragOver(event, '${t.id}')"
+      ondragleave="onTabDragLeave(event)"
+      ondrop="onTabDrop(event, '${t.id}')"
+      ondragend="onTabDragEnd(event)">
+      <!-- 관리자에게만 보이는 손잡이 장식(⠿). 실제 드래그는 탭 전체(.tab-item)에서 되지만,
+           "여기를 잡고 끌면 순서를 바꿀 수 있다"는 걸 눈에 띄게 알려주기 위한 용도임 -->
+      ${isAdmin ? '<span class="tab-drag-hint">⠿</span>' : ''}
       <!--
         tab-label(탭 이름) 글자 설명:
         - contenteditable: 관리자일 때만 "true" -> 클릭하면 그 자리에서 바로 글자를 고칠 수 있음
@@ -835,6 +886,79 @@ async function addTab(){
     console.error(err);
     setSyncNote('탭 추가 실패: ' + err.message, true);
   }
+}
+
+// ----------------------------------------------------------------------------
+// ▣ 탭(게시판) 순서를 마우스로 드래그해서 바꾸는 기능 (관리자 전용)
+// - 브라우저에 원래 내장되어 있는 "드래그 앤 드롭" 기능을 사용합니다.
+// - 순서는 draggedTabId(지금 손으로 집어서 옮기고 있는 탭)를,
+//   마우스를 놓은(drop) 위치에 있던 탭 자리로 끼워넣는 방식으로 계산합니다.
+// - 순서가 바뀌면 화면을 바로 다시 그린 뒤(사용자는 바로 결과를 봄),
+//   뒤이어 서버에도 새 순서(sort_order 숫자)를 하나씩 저장해서 다음에 접속해도 유지되게 합니다.
+// ----------------------------------------------------------------------------
+let draggedTabId = null; // 지금 손으로 집어서 드래그하고 있는 탭의 id (드래그 중이 아니면 null)
+
+// 탭을 손으로 "집는" 순간(마우스 버튼을 누른 채 움직이기 시작하는 순간) 실행됨
+function onTabDragStart(e, tabId){
+  if(!isAdmin) return; // 관리자가 아니면 애초에 draggable="false"라서 여기 올 일이 없지만, 이중 안전장치
+  draggedTabId = tabId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.classList.add('dragging'); // 집은 탭을 살짝 투명하게 표시
+}
+
+// 집은 탭을 다른 탭 위로 끌고 지나가는 동안 계속(아주 짧은 간격으로) 실행됨
+function onTabDragOver(e, overTabId){
+  if(!draggedTabId) return;
+  e.preventDefault(); // ★ 이 줄이 없으면 브라우저가 "여긴 놓을 수 없는 자리"로 취급해서 drop이 아예 발생하지 않음
+  e.dataTransfer.dropEffect = 'move';
+  if(overTabId !== draggedTabId){
+    e.currentTarget.classList.add('drag-over'); // 지금 위에 올라가 있는 탭 자리에 초록 세로줄 표시
+  }
+}
+// 다른 탭 위에서 벗어나면(더 이상 그 자리에 놓을 게 아니면) 위 초록 세로줄 표시를 지움
+function onTabDragLeave(e){
+  e.currentTarget.classList.remove('drag-over');
+}
+
+// 마우스 버튼을 놓아서(drop) 탭을 실제로 그 자리에 끼워넣는 순간 실행됨
+async function onTabDrop(e, targetTabId){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if(!draggedTabId || draggedTabId === targetTabId) return; // 자기 자신 위에 놓으면 아무 일도 안 함
+
+  const fromIdx = tabs.findIndex(t => t.id === draggedTabId);
+  const toIdx = tabs.findIndex(t => t.id === targetTabId);
+  if(fromIdx === -1 || toIdx === -1) return;
+
+  // 배열에서 집었던 탭을 빼낸 뒤, 놓은 자리에 다시 끼워넣음 (화면에 보이는 순서를 그대로 바꾸는 것)
+  const [moved] = tabs.splice(fromIdx, 1);
+  tabs.splice(toIdx, 0, moved);
+  // 새로 정렬된 순서대로 sort_order 값을 0,1,2,3...으로 다시 매김
+  tabs.forEach((t, i) => { t.sort_order = i; });
+
+  renderTabs(); // 사용자에게는 바뀐 순서를 곧바로 보여줌
+
+  // 서버(Supabase)에도 바뀐 순서를 저장해서, 새로고침하거나 다른 사람이 봐도 이 순서가 유지되게 함
+  try{
+    setSyncNote('탭 순서 저장 중...');
+    await Promise.all(tabs.map(t =>
+      sb(`board_tabs?id=eq.${t.id}`, {
+        method:'PATCH', prefer:'return=minimal',
+        body: JSON.stringify({ sort_order:t.sort_order })
+      })
+    ));
+    setSyncNote('탭 순서 저장됨');
+  }catch(err){
+    console.error(err);
+    setSyncNote('탭 순서 저장 실패: ' + err.message, true);
+  }
+}
+
+// 드래그가 끝나는 순간(놓았든, 도중에 ESC 등으로 취소했든) 항상 실행되어 뒷정리를 함
+function onTabDragEnd(e){
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.tab-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+  draggedTabId = null;
 }
 
 // ----------------------------------------------------------------------------
