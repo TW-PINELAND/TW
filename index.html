@@ -295,7 +295,7 @@
   main{ max-width:1000px; margin:0 auto; padding:20px; transition:max-width .15s; }
   /* 드롭테이블 탭을 보고 있을 때만 JS가 <main>에 이 클래스를 붙여서 폭을 훨씬 넓게 씁니다
      (사냥터 탭/몬스터 카드/아이템 칩이 많아서 좁으면 답답하고 스크롤이 잦기 때문) */
-  main.wide-layout{ max-width:1995px; }
+  main.wide-layout{ max-width:1400px; }
 
   /* 툴바(검색창+새로고침) 바로 위, 현재 선택된 탭(게시판)의 이름을 크게 보여주는 초록색 제목.
      ★ 이 글자는 따로 고칠 필요 없이, 위 탭바에서 탭 이름을 바꾸면 자동으로 여기도 똑같이 바뀝니다
@@ -422,6 +422,17 @@
     color:var(--muted); padding:4px; border-radius:6px; line-height:0;
   }
   .modal-close:hover{ background:var(--paper); color:var(--ink); }
+
+  /* "새 탭 종류 선택" 모달 안의 선택 카드 (게시판 / 드롭테이블 중 고르는 큰 버튼) */
+  .tab-type-choice{
+    border:1px solid var(--line); border-radius:10px;
+    padding:14px; cursor:pointer; margin-bottom:10px;
+    transition:border-color .15s, background .15s;
+  }
+  .tab-type-choice:last-child{ margin-bottom:0; }
+  .tab-type-choice:hover{ border-color:var(--blueprint); background:var(--blueprint-bg); }
+  .tab-type-choice-title{ font-weight:700; font-size:14px; color:var(--ink); margin-bottom:4px; }
+  .tab-type-choice-desc{ font-size:12.5px; color:var(--muted); }
   /* modal-body: 팝업의 "가운데" 영역. flex:1로 줘서, 팝업이 min-height(65vh) 때문에
      내용보다 더 커진 만큼의 남는 공간을 이 부분이 전부 흡수하도록 함.
      → 이렇게 해야 아래쪽 "취소/저장" 버튼(modal-foot)이 붕 뜨지 않고 항상 팝업 맨 아래에 붙어있게 됨. */
@@ -614,6 +625,32 @@
 
   <div class="sync-note" id="syncNote"></div>
 </main>
+
+<!-- ============================================================
+     ▣ 새 탭 종류 선택 모달 - "+" 버튼을 누르면 가장 먼저 뜨는 팝업.
+     여기서 고른 종류(type)를 그대로 createNewTab(type)에 넘겨서 실제 탭을 만듭니다.
+     ============================================================ -->
+<div class="modal-overlay" id="newTabTypeOverlay">
+  <div class="modal-box modal-sm">
+    <div class="modal-head">
+      <h2>새 탭 종류 선택</h2>
+      <button class="modal-close" onclick="closeNewTabTypeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tab-type-choice" onclick="createNewTab('board')">
+        <div class="tab-type-choice-title">📋 일반 게시판</div>
+        <div class="tab-type-choice-desc">글 목록 + 클릭하면 팝업으로 본문(글+이미지) 보기</div>
+      </div>
+      <div class="tab-type-choice" onclick="createNewTab('droptable')">
+        <div class="tab-type-choice-title">🗂️ 계층형 게시판</div>
+        <div class="tab-type-choice-desc">탭 → 중분류 → 항목 → 하위 목록 구조. 검색 지원</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeNewTabTypeModal()">취소</button>
+    </div>
+  </div>
+</div>
 
 <!-- ============================================================
      ▣ 관리자 로그인 모달
@@ -947,6 +984,7 @@ document.addEventListener('keydown', function(e){
   if(document.getElementById('writeOverlay').classList.contains('open')) closeWriteModal();
   else if(document.getElementById('detailOverlay').classList.contains('open')) closeDetailModal();
   else if(document.getElementById('loginOverlay').classList.contains('open')) closeLoginModal();
+  else if(document.getElementById('newTabTypeOverlay').classList.contains('open')) closeNewTabTypeModal();
 });
 
 // ----------------------------------------------------------------------------
@@ -1052,7 +1090,7 @@ function renderTabs(){
     </div>
   `).join('');
   if(isAdmin){
-    html += `<button class="tab-add-btn" onclick="addTab()" title="탭(게시판) 추가">+</button>`;
+    html += `<button class="tab-add-btn" onclick="openNewTabTypeModal()" title="탭 추가">+</button>`;
   }
   bar.innerHTML = html;
 }
@@ -1099,26 +1137,34 @@ function onTabLabelKeydown(e, el){
   }
 }
 
-// "+" 버튼을 눌러 새 탭(=새 게시판)을 하나 추가하는 함수.
+// "+" 버튼을 누르면 openNewTabTypeModal()이 먼저 실행되어 "일반 게시판 / 드롭테이블" 중 고르는
+// 작은 팝업을 띄우고, 사람이 그 중 하나를 고르면 이 createNewTab(type)이 실제로 탭을 만듭니다.
 // 만들어지자마자 그 탭으로 자동 전환되고, 이름 글자 전체가 선택된 상태로 커서가 놓여서
-// 바로 타이핑하면 "새 탭"이라는 기본 이름이 통째로 원하는 이름으로 바뀌게 됩니다.
-async function addTab(){
+// 바로 타이핑하면 기본 이름이 통째로 원하는 이름으로 바뀌게 됩니다.
+function openNewTabTypeModal(){
+  document.getElementById('newTabTypeOverlay').classList.add('open');
+}
+function closeNewTabTypeModal(){
+  document.getElementById('newTabTypeOverlay').classList.remove('open');
+}
+async function createNewTab(type){
+  closeNewTabTypeModal();
   try{
     const maxOrder = tabs.length ? Math.max(...tabs.map(t => t.sort_order || 0)) : -1;
-    // "+"로 새로 만드는 탭은 항상 일반 게시판(tab_type:'board')입니다.
-    // 드롭테이블 같은 특수 탭은 SQL로 미리 만들어두는 방식이라, 여기서는 board 탭만 생성합니다.
+    const defaultLabel = '새 탭'; // 어떤 종류든 기본 이름은 통일 (어차피 관리자가 바로 원하는 이름으로 바꾸므로)
     const [created] = await sb('board_tabs', {
-      method:'POST', body: JSON.stringify({ label:'새 탭', sort_order: maxOrder + 1, tab_type:'board' })
+      method:'POST', body: JSON.stringify({ label:defaultLabel, sort_order: maxOrder + 1, tab_type:type })
     });
     tabs.push(created);
     activeTabId = created.id;
+    activeDropZoneId = null; // 새로 만든 탭이니, 이전에 다른 드롭테이블 탭에서 보고 있던 사냥터 선택은 초기화
     renderTabs();
     await updateContentViewForActiveTab();
     setTimeout(() => {
       const span = document.querySelector(`.tab-item[data-tab-id="${created.id}"] .tab-label`);
       if(!span) return;
       span.focus();
-      // 방금 만든 탭의 이름 글자("새 탭") 전체를 선택 상태로 만들어서, 바로 타이핑하면 전부 교체되도록 함
+      // 방금 만든 탭의 이름 글자 전체를 선택 상태로 만들어서, 바로 타이핑하면 전부 교체되도록 함
       const range = document.createRange();
       range.selectNodeContents(span);
       const sel = window.getSelection();
@@ -1154,7 +1200,7 @@ async function updateContentViewForActiveTab(){
 
   // 탭을 바꿀 때마다 검색창은 항상 비워서 시작합니다 (이전 탭에서 검색하던 내용이 남아있지 않도록)
   document.getElementById('searchInput').value = '';
-  document.getElementById('searchInput').placeholder = isDropTab ? '몬스터/아이템 검색' : '제목 검색';
+  document.getElementById('searchInput').placeholder = isDropTab ? '검색' : '제목 검색';
   searchQuery = '';
   dropSearchQuery = '';
 
@@ -1188,15 +1234,18 @@ async function sbAllRows(basePath){
   return all;
 }
 
-// 드롭테이블 데이터는 사냥터 수가 많지 않아서(18개 안팎), 탭을 열 때 전체를 한 번에 불러온 뒤
-// 화면(자바스크립트 메모리) 안에서만 사냥터 전환/검색을 처리합니다 (매번 서버에 다시 물어보지 않음).
-// 관리자가 뭔가 추가/수정/삭제할 때만 그 부분을 서버에 반영합니다.
-async function loadDropTableData(){
+// 드롭테이블 데이터는 사냥터 수가 많지 않아서(탭 하나당 몇~몇십 개 안팎), 그 탭을 열 때
+// 전체를 한 번에 불러온 뒤 화면(자바스크립트 메모리) 안에서만 사냥터 전환/검색을 처리합니다.
+// tabId를 받아서, "그 드롭테이블 탭 소속인 사냥터들"만 filter해서 가져옵니다
+// (사냥터가 여러 개의 드롭테이블 탭에 걸쳐 섞이지 않도록 하기 위함).
+async function loadDropTableData(tabId){
   // ★ 속도 개선: 사냥터/몬스터/아이템은 서로 의존관계가 없어서, 하나씩 순서대로 기다리지 않고
   //   Promise.all로 "동시에" 요청을 보냅니다. 전체 대기시간이 3개를 합친 시간이 아니라
   //   그 중 가장 오래 걸리는 1개의 시간 정도로 줄어듭니다.
+  //   (몬스터/아이템은 tab_id 컬럼이 없지만, 사냥터의 zone_id를 통해 자동으로 연결되기 때문에
+  //    사냥터만 tab_id로 걸러도 결과적으로 이 탭 소속 데이터만 화면에 나타나게 됩니다)
   const [zones, monsters, items] = await Promise.all([
-    sbAllRows('drop_zones?select=*&order=sort_order.asc'),
+    sbAllRows(`drop_zones?select=*&tab_id=eq.${tabId}&order=sort_order.asc`),
     sbAllRows('drop_monsters?select=*&order=sort_order.asc'),
     sbAllRows('drop_items?select=*&order=sort_order.asc')
   ]);
@@ -1215,18 +1264,25 @@ async function loadDropTableData(){
     if(m) m.items.push(it);
   });
 
-  dropZones = zones.map(z => ({ ...z, monsters: monstersByZone[z.id] || [] }));
+  return zones.map(z => ({ ...z, monsters: monstersByZone[z.id] || [] }));
 }
 
-// 드롭테이블 탭을 열 때 실행 - 데이터가 아직 한 번도 안 불러와졌으면 불러오고, 화면을 그림
+let dropDataCacheByTab = {}; // 드롭테이블 탭 id → 그 탭의 사냥터 목록. 탭을 다시 열 때마다 매번 새로 안 불러오려는 캐시.
+
+// 드롭테이블 탭을 열 때 실행 - 이 탭의 데이터를 캐시에서 찾아보고, 없으면 서버에서 불러온 뒤 화면을 그림
 async function ensureDropDataLoadedThenRender(){
   try{
     setSyncStatus('loading');
-    if(dropZones.length === 0){
-      await loadDropTableData();
+    if(dropDataCacheByTab[activeTabId]){
+      dropZones = dropDataCacheByTab[activeTabId];
+    } else {
+      dropZones = await loadDropTableData(activeTabId);
+      dropDataCacheByTab[activeTabId] = dropZones;
     }
-    if(!activeDropZoneId && dropZones.length){
-      activeDropZoneId = dropZones[0].id;
+    // ★ 버그 방지: 다른 드롭테이블 탭에서 보고 있던 사냥터 id가 남아있으면(그 사냥터는 지금 이
+    //   탭 소속이 아니므로) 무시하고, 이 탭의 첫 번째 사냥터로 다시 맞춰줍니다.
+    if(!activeDropZoneId || !dropZones.find(z => z.id === activeDropZoneId)){
+      activeDropZoneId = dropZones.length ? dropZones[0].id : null;
     }
     renderZoneTabBar();
     renderZoneContent();
@@ -1248,11 +1304,11 @@ function renderZoneTabBar(){
       <span class="tab-label" contenteditable="${isAdmin ? 'true' : 'false'}"
         onblur="onZoneLabelBlur('${z.id}', this)"
         onkeydown="onTabLabelKeydown(event, this)">${escapeHtml(z.name)}</span>
-      ${isAdmin ? `<span class="zone-delete-btn" onclick="event.stopPropagation(); deleteZone('${z.id}')" title="사냥터 삭제">✕</span>` : ''}
+      ${isAdmin ? `<span class="zone-delete-btn" onclick="event.stopPropagation(); deleteZone('${z.id}')" title="탭 삭제">✕</span>` : ''}
     </div>
   `).join('');
   if(isAdmin){
-    html += `<button class="tab-add-btn" onclick="addZone()" title="사냥터 추가">+</button>`;
+    html += `<button class="tab-add-btn" onclick="addZone()" title="새 탭 추가">+</button>`;
   }
   bar.innerHTML = html;
 }
@@ -1272,17 +1328,17 @@ function onZoneTabClick(zoneId){
 async function onZoneLabelBlur(zoneId, el){
   if(!isAdmin) return;
   let newName = el.textContent.trim();
-  if(!newName) newName = '사냥터';
+  if(!newName) newName = '탭';
   const zone = dropZones.find(z => z.id === zoneId);
   if(zone && zone.name === newName){ el.textContent = newName; return; }
   try{
     await sb(`drop_zones?id=eq.${zoneId}`, { method:'PATCH', prefer:'return=minimal', body: JSON.stringify({ name:newName }) });
     if(zone) zone.name = newName;
     el.textContent = newName;
-    setSyncNote('사냥터 이름 저장됨');
+    setSyncNote('탭 이름 저장됨');
   }catch(err){
     console.error(err);
-    setSyncNote('사냥터 이름 저장 실패: ' + err.message, true);
+    setSyncNote('탭 이름 저장 실패: ' + err.message, true);
   }
 }
 
@@ -1291,7 +1347,7 @@ async function addZone(){
   try{
     const maxOrder = dropZones.length ? Math.max(...dropZones.map(z => z.sort_order || 0)) : -1;
     const [created] = await sb('drop_zones', {
-      method:'POST', body: JSON.stringify({ name:'새 사냥터', sort_order: maxOrder + 1 })
+      method:'POST', body: JSON.stringify({ name:'새 탭', sort_order: maxOrder + 1, tab_id:activeTabId })
     });
     dropZones.push({ ...created, monsters: [] });
     activeDropZoneId = created.id;
@@ -1309,25 +1365,26 @@ async function addZone(){
     }, 50);
   }catch(err){
     console.error(err);
-    setSyncNote('사냥터 추가 실패: ' + err.message, true);
+    setSyncNote('탭 추가 실패: ' + err.message, true);
   }
 }
 
 // 사냥터를 통째로 삭제 (그 안의 몬스터/아이템도 DB에서 자동으로 같이 삭제됨 - on delete cascade 덕분)
 async function deleteZone(zoneId){
-  if(!confirm('이 사냥터를 삭제할까요? 안에 있는 몬스터/아이템 정보도 모두 함께 삭제되며, 되돌릴 수 없습니다.')) return;
+  if(!confirm('이 탭을 삭제할까요? 안에 있는 항목 정보도 모두 함께 삭제되며, 되돌릴 수 없습니다.')) return;
   try{
     await sb(`drop_zones?id=eq.${zoneId}`, { method:'DELETE', prefer:'return=minimal' });
     dropZones = dropZones.filter(z => z.id !== zoneId);
+    dropDataCacheByTab[activeTabId] = dropZones; // 배열을 통째로 새로 만들었으니, 캐시에 있는 참조도 같이 갱신해줌
     if(activeDropZoneId === zoneId){
       activeDropZoneId = dropZones.length ? dropZones[0].id : null;
     }
     renderZoneTabBar();
     renderZoneContent();
-    setSyncNote('사냥터 삭제됨');
+    setSyncNote('탭 삭제됨');
   }catch(err){
     console.error(err);
-    setSyncNote('사냥터 삭제 실패: ' + err.message, true);
+    setSyncNote('탭 삭제 실패: ' + err.message, true);
   }
 }
 
@@ -1342,18 +1399,18 @@ function renderZoneContent(){
   }
   const zone = dropZones.find(z => z.id === activeDropZoneId);
   if(!zone){
-    container.innerHTML = '<div class="empty">사냥터가 없습니다.' + (isAdmin ? ' 위 + 버튼으로 사냥터를 추가해보세요.' : '') + '</div>';
+    container.innerHTML = '<div class="empty">탭이 없습니다.' + (isAdmin ? ' 위 + 버튼으로 탭을 추가해보세요.' : '') + '</div>';
     return;
   }
-  // 관리자에게만 보이는 "+ 소구역 추가" 버튼 (맨 위에 항상 떠있음 - 몬스터가 하나도 없어도 눌러서 시작할 수 있음)
+  // 관리자에게만 보이는 "+ 중분류 추가" 버튼 (맨 위에 항상 떠있음 - 항목이 하나도 없어도 눌러서 시작할 수 있음)
   const subZoneAddBtn = isAdmin
-    ? `<div class="zone-toolbar"><button class="chip-add" onclick="addSubZone('${zone.id}')">+ 소구역 추가</button></div>`
+    ? `<div class="zone-toolbar"><button class="chip-add" onclick="addSubZone('${zone.id}')">+ 중분류 추가</button></div>`
     : '';
 
   if(zone.monsters.length === 0){
     container.innerHTML = subZoneAddBtn +
-      `<div class="empty">등록된 몬스터가 없습니다.</div>` +
-      (isAdmin ? `<button class="write-btn" style="margin-top:10px;" onclick="addMonster('${zone.id}', null)">+ 몬스터 추가</button>` : '');
+      `<div class="empty">등록된 항목이 없습니다.</div>` +
+      (isAdmin ? `<button class="write-btn" style="margin-top:10px;" onclick="addMonster('${zone.id}', null)">+ 항목 추가</button>` : '');
     return;
   }
   // 몬스터 배열을, 연속으로 같은 sub_zone 값을 가진 것끼리 묶어서 그룹 목록으로 만듦
@@ -1388,7 +1445,7 @@ function renderZoneContent(){
           ondragleave="onSubzoneDragLeave(event)"
           ondrop="onSubzoneDrop(event, '${zone.id}', '${idsAttr}')"
           ondragend="onSubzoneDragEnd(event)">
-          ${isAdmin ? '<span class="subzone-drag-hint" title="드래그해서 이 소구역 전체를 옮기기">⠿</span>' : ''}
+          ${isAdmin ? '<span class="subzone-drag-hint" title="드래그해서 이 중분류 전체를 옮기기">⠿</span>' : ''}
           <span class="subzone-heading" contenteditable="${isAdmin ? 'true' : 'false'}"
             data-zone-id="${zone.id}" data-monster-ids="${idsAttr}"
             onblur="onSubzoneHeadingBlur(this)" onkeydown="onTabLabelKeydown(event, this)">${escapeHtml(group.subZone)}</span>
@@ -1400,7 +1457,7 @@ function renderZoneContent(){
       // 이 소구역(또는 소구역 없음 그룹)의 맨 끝에, "이 구역에 몬스터를 추가"하는 버튼을 넣음.
       // ★ 소구역 이름을 JS 코드 문자열로 직접 끼워넣지 않고 data-subzone 속성에 담아두는 이유:
       //   이름에 따옴표(') 같은 특수문자가 들어있어도 안전하게 처리하기 위해서입니다.
-      html += `<div class="subzone-add-row"><button class="chip-add" data-zone-id="${zone.id}" data-subzone="${escapeHtml(group.subZone || '')}" onclick="addMonsterFromBtn(this)">+ 몬스터 추가</button></div>`;
+      html += `<div class="subzone-add-row"><button class="chip-add" data-zone-id="${zone.id}" data-subzone="${escapeHtml(group.subZone || '')}" onclick="addMonsterFromBtn(this)">+ 항목 추가</button></div>`;
     }
   });
   container.innerHTML = html;
@@ -1417,7 +1474,7 @@ function renderMonsterRowHtml(m, zoneId){
     </span>
   `).join('');
   const addItemBtn = isAdmin ? `<span class="chip-add" onclick="addItem('${m.id}')">+ 아이템</span>` : '';
-  const deleteMonsterBtn = isAdmin ? `<span class="monster-delete" onclick="deleteMonster('${m.id}')" title="몬스터 삭제">✕</span>` : '';
+  const deleteMonsterBtn = isAdmin ? `<span class="monster-delete" onclick="deleteMonster('${m.id}')" title="항목 삭제">✕</span>` : '';
   // 관리자에게만 보이는 손잡이 장식(⠿) - 탭 드래그와 같은 방식으로, 몬스터 카드 전체를 드래그해서
   // 다른 몬스터 위에 놓으면 그 자리(그 몬스터가 속한 소구역)로 옮겨집니다.
   const dragHint = isAdmin ? '<span class="monster-drag-hint">⠿</span>' : '';
@@ -1485,7 +1542,7 @@ async function addSubZone(zoneId){
     if(!zone) return;
     const maxOrder = zone.monsters.length ? Math.max(...zone.monsters.map(m => m.sort_order || 0)) : -1;
     const [created] = await sb('drop_monsters', {
-      method:'POST', body: JSON.stringify({ zone_id:zoneId, sub_zone:'새 소구역', name:'새 몬스터', sort_order: maxOrder + 1 })
+      method:'POST', body: JSON.stringify({ zone_id:zoneId, sub_zone:'새 중분류', name:'새 항목', sort_order: maxOrder + 1 })
     });
     zone.monsters.push({ ...created, items: [] });
     renderZoneContent();
@@ -1504,7 +1561,7 @@ async function addSubZone(zoneId){
     }, 50);
   }catch(err){
     console.error(err);
-    setSyncNote('소구역 추가 실패: ' + err.message, true);
+    setSyncNote('중분류 추가 실패: ' + err.message, true);
   }
 }
 
@@ -1518,7 +1575,7 @@ async function onSubzoneHeadingBlur(el){
   if(!zone || !ids.length) return;
 
   let newName = el.textContent.trim();
-  if(!newName) newName = '소구역';
+  if(!newName) newName = '중분류';
 
   const already = zone.monsters.find(m => m.id === ids[0]);
   if(already && already.sub_zone === newName){ el.textContent = newName; return; } // 실제로 바뀐 게 없으면 저장 생략
@@ -1531,11 +1588,11 @@ async function onSubzoneHeadingBlur(el){
       const m = zone.monsters.find(mm => mm.id === id);
       if(m) m.sub_zone = newName;
     });
-    setSyncNote('소구역 이름 저장됨');
+    setSyncNote('중분류 이름 저장됨');
     renderZoneContent(); // data-속성(몬스터별 소구역 값)들을 최신 이름 기준으로 다시 맞추기 위해 전체를 다시 그림
   }catch(err){
     console.error(err);
-    setSyncNote('소구역 이름 저장 실패: ' + err.message, true);
+    setSyncNote('중분류 이름 저장 실패: ' + err.message, true);
   }
 }
 
@@ -1576,7 +1633,7 @@ async function addMonster(zoneId, subZone){
     }
 
     const [created] = await sb('drop_monsters', {
-      method:'POST', body: JSON.stringify({ zone_id:zoneId, sub_zone:subZone, name:'새 몬스터', sort_order:newOrder })
+      method:'POST', body: JSON.stringify({ zone_id:zoneId, sub_zone:subZone, name:'새 항목', sort_order:newOrder })
     });
     zone.monsters.push({ ...created, items: [] });
     zone.monsters.sort((a, b) => a.sort_order - b.sort_order); // 방금 밀어낸 순서 그대로 화면에도 반영
@@ -1593,7 +1650,7 @@ async function addMonster(zoneId, subZone){
     }, 50);
   }catch(err){
     console.error(err);
-    setSyncNote('몬스터 추가 실패: ' + err.message, true);
+    setSyncNote('항목 추가 실패: ' + err.message, true);
   }
 }
 
@@ -1644,17 +1701,17 @@ async function onMonsterDrop(e, targetMonsterId, zoneId){
 
   // 서버에도 반영 (옮긴 몬스터의 소구역 변경 + 사냥터 전체 몬스터의 순서 변경)
   try{
-    setSyncNote('몬스터 순서 저장 중...');
+    setSyncNote('항목 순서 저장 중...');
     await Promise.all(zone.monsters.map(m =>
       sb(`drop_monsters?id=eq.${m.id}`, {
         method:'PATCH', prefer:'return=minimal',
         body: JSON.stringify({ sort_order:m.sort_order, sub_zone:m.sub_zone })
       })
     ));
-    setSyncNote('몬스터 순서 저장됨');
+    setSyncNote('항목 순서 저장됨');
   }catch(err){
     console.error(err);
-    setSyncNote('몬스터 순서 저장 실패: ' + err.message, true);
+    setSyncNote('항목 순서 저장 실패: ' + err.message, true);
   }
 }
 function onMonsterDragEnd(e){
@@ -1722,14 +1779,14 @@ async function onSubzoneDrop(e, zoneId, targetMonsterIdsCsv){
   renderZoneContent();
 
   try{
-    setSyncNote('소구역 순서 저장 중...');
+    setSyncNote('중분류 순서 저장 중...');
     await Promise.all(zone.monsters.map(m =>
       sb(`drop_monsters?id=eq.${m.id}`, { method:'PATCH', prefer:'return=minimal', body: JSON.stringify({ sort_order:m.sort_order }) })
     ));
-    setSyncNote('소구역 순서 저장됨');
+    setSyncNote('중분류 순서 저장됨');
   }catch(err){
     console.error(err);
-    setSyncNote('소구역 순서 저장 실패: ' + err.message, true);
+    setSyncNote('중분류 순서 저장 실패: ' + err.message, true);
   }
   draggedGroupMonsterIds = null;
   draggedGroupZoneId = null;
@@ -1745,29 +1802,29 @@ function onSubzoneDragEnd(e){
 async function onMonsterNameBlur(monsterId, el){
   if(!isAdmin) return;
   let newName = el.textContent.trim();
-  if(!newName) newName = '몬스터';
+  if(!newName) newName = '항목';
   try{
     await sb(`drop_monsters?id=eq.${monsterId}`, { method:'PATCH', prefer:'return=minimal', body: JSON.stringify({ name:newName }) });
     dropZones.forEach(z => { const m = z.monsters.find(mm => mm.id === monsterId); if(m) m.name = newName; });
     el.textContent = newName;
-    setSyncNote('몬스터 이름 저장됨');
+    setSyncNote('항목 이름 저장됨');
   }catch(err){
     console.error(err);
-    setSyncNote('몬스터 이름 저장 실패: ' + err.message, true);
+    setSyncNote('항목 이름 저장 실패: ' + err.message, true);
   }
 }
 
 // 몬스터를 통째로 삭제 (그 몬스터가 드랍하던 아이템들도 자동으로 같이 삭제됨)
 async function deleteMonster(monsterId){
-  if(!confirm('이 몬스터를 삭제할까요? 드랍 아이템 목록도 함께 삭제됩니다.')) return;
+  if(!confirm('이 항목을 삭제할까요? 하위 목록도 함께 삭제됩니다.')) return;
   try{
     await sb(`drop_monsters?id=eq.${monsterId}`, { method:'DELETE', prefer:'return=minimal' });
     dropZones.forEach(z => { z.monsters = z.monsters.filter(m => m.id !== monsterId); });
     renderZoneContent();
-    setSyncNote('몬스터 삭제됨');
+    setSyncNote('항목 삭제됨');
   }catch(err){
     console.error(err);
-    setSyncNote('몬스터 삭제 실패: ' + err.message, true);
+    setSyncNote('항목 삭제 실패: ' + err.message, true);
   }
 }
 
