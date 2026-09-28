@@ -5,7 +5,7 @@ const configured = Boolean(config.supabaseUrl && config.publishableKey && config
 let records = [], cardNumbers = ['', '', ''], selectedCard = null, loaded = false, busy = false, refreshing = false, toastTimer, pending = null;
 const $ = selector => document.querySelector(selector);
 const money = value => value.toLocaleString('ko-KR');
-const cardName = index => `카드 ${String(index + 1).padStart(2, '0')}`;
+const cardLabel = index => cardNumbers[index] || '번호 미등록';
 const balance = index => INITIAL_BALANCE - records.filter(r => r.card === index).reduce((sum, r) => sum + r.amount, 0);
 function notify(message) {
   $('#toast').textContent = message; $('#toast').classList.add('visible');
@@ -34,17 +34,16 @@ function updateEstimate() {
   $('#after-balance').textContent = loaded ? `${money(balance(selectedCard) - enteredAmount())}원` : '연결 대기 중';
 }
 function render() {
-  $('#total').innerHTML = loaded ? `${money([0,1,2].reduce((sum, i) => sum + balance(i), 0))}<span>원</span>` : '—<span>원</span>';
   document.querySelectorAll('[data-card]').forEach((button, i) => {
     button.setAttribute('aria-selected', String(selectedCard === i)); button.tabIndex = selectedCard === null || selectedCard === i ? 0 : -1;
     $(`[data-balance="${i}"]`).innerHTML = loaded ? `${money(balance(i))}<small>원</small>` : '—<small>원</small>';
-    $(`[data-card-number="${i}"]`).textContent = loaded ? (cardNumbers[i] ? `끝자리 •••• ${cardNumbers[i]}` : '끝 4자리 미등록') : '번호 연결 대기';
+    $(`[data-card-title="${i}"]`).textContent = loaded ? cardLabel(i) : '연결 중';
     $(`[data-spent="${i}"]`).textContent = loaded ? `사용 ${money(INITIAL_BALANCE - balance(i))}원` : '연결 대기 중';
     $(`[data-meter="${i}"]`).style.width = `${loaded ? balance(i) / INITIAL_BALANCE * 100 : 0}%`;
   });
   $('#welcome').hidden = selectedCard !== null; $('#history').hidden = selectedCard === null;
   if (selectedCard === null) return;
-  $('#history').setAttribute('aria-labelledby', `tab-${selectedCard}`); $('#history-card').textContent = `CARD ${String(selectedCard + 1).padStart(2, '0')}${cardNumbers[selectedCard] ? ` · •••• ${cardNumbers[selectedCard]}` : ''}`;
+  $('#history').setAttribute('aria-labelledby', `tab-${selectedCard}`); $('#history-card').textContent = cardLabel(selectedCard);
   $('#edit-card-number').textContent = cardNumbers[selectedCard] ? '카드번호 변경' : '카드번호 등록';
   const entries = records.filter(r => r.card === selectedCard).sort((a,b) => b.date.localeCompare(a.date));
   $('#count').textContent = loaded ? `${entries.length}건` : ''; $('#entries').replaceChildren();
@@ -84,13 +83,13 @@ async function refresh() {
   finally { refreshing = false; }
 }
 function openEntry(index) {
-  selectedCard = index; render(); $('#entry-form').reset(); pending = null; $('#dialog-card').textContent = cardName(index);
+  selectedCard = index; render(); $('#entry-form').reset(); pending = null; $('#dialog-card').textContent = cardLabel(index);
   $('#form-error').textContent = configured ? '' : '공동 기록을 시작하려면 공유 저장소 연결이 필요합니다.';
   updateEstimate(); $('#entry-dialog').showModal(); $('#amount').focus();
 }
 function openNumberDialog() {
   if (selectedCard === null) return;
-  $('#number-form').reset(); $('#number-dialog-card').textContent = cardName(selectedCard);
+  $('#number-form').reset(); $('#number-dialog-card').textContent = cardLabel(selectedCard);
   $('#card-number-input').value = cardNumbers[selectedCard] || ''; $('#number-error').textContent = '';
   $('#number-dialog').showModal(); $('#card-number-input').focus();
 }
@@ -125,7 +124,7 @@ $('#entry-form').addEventListener('submit', async event => {
   if (!isRetry) pending = {fingerprint, id:crypto.randomUUID()};
   busy = true; $('#form-error').textContent = '';
   const controls = [...$('#entry-form').querySelectorAll('button,input')]; controls.forEach(c => c.disabled = true); $('.submit').textContent = '기록하는 중…';
-  try { records = await rpc('card_add', {p_id:pending.id,p_card:selectedCard,p_amount:amount,p_memo:memo}); pending = null; render(); $('#entry-dialog').close(); notify(`${cardName(selectedCard)} · ${money(amount)}원을 기록했어요.`); }
+  try { records = await rpc('card_add', {p_id:pending.id,p_card:selectedCard,p_amount:amount,p_memo:memo}); pending = null; render(); $('#entry-dialog').close(); notify(`${cardLabel(selectedCard)} · ${money(amount)}원을 기록했어요.`); }
   catch (error) { $('#form-error').textContent = errorMessage(error); }
   finally { busy = false; controls.forEach(c => c.disabled = false); $('.submit').textContent = '사용 금액 기록하기'; render(); }
 });
@@ -136,7 +135,7 @@ $('#number-form').addEventListener('submit', async event => {
   if (!/^\d{4}$/.test(number)) { $('#number-error').textContent = '카드번호 끝 4자리를 숫자로 입력해 주세요.'; $('#card-number-input').focus(); return; }
   busy = true; const controls = [...$('#number-form').querySelectorAll('button,input')]; controls.forEach(control => control.disabled = true);
   $('#number-form .submit').textContent = '저장하는 중…';
-  try { cardNumbers = await rpc('card_number_update', {p_card:selectedCard,p_number:number}); render(); $('#number-dialog').close(); notify(`${cardName(selectedCard)} 번호를 저장했어요.`); }
+  try { cardNumbers = await rpc('card_number_update', {p_card:selectedCard,p_number:number}); render(); $('#number-dialog').close(); notify(`${cardLabel(selectedCard)} 번호를 저장했어요.`); }
   catch (error) { $('#number-error').textContent = errorMessage(error); }
   finally { busy = false; controls.forEach(control => control.disabled = false); $('#number-form .submit').textContent = '카드번호 저장하기'; render(); }
 });
